@@ -133,3 +133,5 @@ def str_to_int(str):
         return 0
     else:
         return int(str.replace(',', ''))
+
+#%% More or less ready for Spearman correlation and automating data updates.
