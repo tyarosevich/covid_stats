@@ -38,14 +38,17 @@ try:
 
 except FileNotFoundError:
 
-    #Drop unneeded columns and drop rows from before vaccine distribution began.
-    df_covid_deaths_formatted = utils.clean_frame(df_covid_deaths, 'covid_deaths')
 
-    # Reformat so that each column corresponds to a week ending on a given
-    # saturday, like the covid_deaths data.
+
+    # Reformat to needed columns, and column labels that are datetime ready
+    # strings. Column labels are all moved to 'week ending on' the date, which is
+    # a saturday, to conform to other CDC data.
     df_pfizer_formatted = utils.clean_frame(df_pfizer, 'pfizer')
     df_moderna_formatted = utils.clean_frame(df_moderna, 'moderna')
 
+    # Totally clean, re-format and re-aggregate this disaster of a dataset. Pfizer frame
+    # is passed as template.
+    df_covid_deaths_formatted = utils.correct_bad_aggreg(utils.clean_frame(df_covid_deaths, 'covid_deaths'), df_pfizer_formatted)
     # Save formatted data
     utils.save_pickle('data/formatted_data.pickle', [df_pfizer_formatted, df_moderna_formatted, df_covid_deaths_formatted])
 
