@@ -76,6 +76,14 @@ def clean_frame(df, type):
     :return: df
         Reformatted dataframe.
     '''
+    state_names = ["Alaska", "Alabama", "Arkansas", "Arizona", "California", "Colorado", "Connecticut",
+                   "District of Columbia", "Delaware", "Florida", "Georgia", "Hawaii", "Iowa", "Idaho", "Illinois",
+                   "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan",
+                   "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska",
+                   "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon",
+                   "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
+                   "Utah", "Virginia", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
+
     # Drops unnecessary columns, and renames date columns to a string timestamp
     # representing 'week ending on this day'. All dates forced up to the next saturday.
     if type == 'covid_deaths':
@@ -100,6 +108,7 @@ def clean_frame(df, type):
             dt.date.fromisoformat)
         df['week_ending_date'] = df['week_ending_date'].apply(normalize_day)
         return df
+
     columns = list(df.columns.values)
     if type == 'pfizer':
         columns_keep = ['jurisdiction', 'first_doses_12_14'] + [x for x in columns if x[0:8] == 'doses_al' or x[0:8] == 'doses_di']
@@ -128,8 +137,8 @@ def clean_frame(df, type):
         df[col] = df[col].apply(str_to_int)
     # Set the index to the state.
     df.set_index('state', drop=False, inplace=True)
+    df = df.loc[state_names, :]
     return df
-
 def normalize_day(date):
     '''
     Moves the timestamp up to the next saturday.
@@ -152,6 +161,14 @@ def str_to_int(str):
 
 
 def correct_bad_aggreg(df_old, df_format):
+    state_names = ["Alaska", "Alabama", "Arkansas", "Arizona", "California", "Colorado", "Connecticut",
+                   "District of Columbia", "Delaware", "Florida", "Georgia", "Hawaii", "Iowa", "Idaho", "Illinois",
+                   "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan",
+                   "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska",
+                   "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon",
+                   "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
+                   "Utah", "Virginia", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
+
     # Format the new df using df_format as a template.
     col_labels = list(df_format.columns.values)
     df_new = pd.DataFrame(columns=col_labels)
@@ -167,7 +184,7 @@ def correct_bad_aggreg(df_old, df_format):
         if row[1] in state_set and str(row[4]) in date_set:
             # x = df_new[df_new['state'] == row[1]].index.values.astype(int)[0]
             df_new[str(row[4])][row[1]] = row[5]
-
+    df_new = df_new.loc[state_names, :]
     return df_new
 
 def update_frames(list_frames, client):
@@ -228,3 +245,40 @@ def covid_deaths_updates(df_old, df_format, client):
     df_old.update(df_new_deaths_formatted, overwrite=False, errors='ignore')
 
     return df_old
+
+def get_current_data():
+    # Check for updates every monday
+    today = dt.date.today()
+    day_of_week = today.weekday()
+    formatted_list = load_pickle('data/formatted_data.pickle')
+    if day_of_week == 0:
+        client = Socrata("data.cdc.gov", None)
+        updated_list = update_frames(formatted_list, client)
+        # Save updated data.
+        save_pickle('data/processed_data.pickle', updated_list)
+        return updated_list
+    else:
+        return formatted_list
+
+def get_total_frame(df1, df2):
+
+    # Combine the two dataframes and replace states with abbrevs.
+    df_vaccine = df1
+    df_vaccine.iloc[:, 2:] += df2.iloc[:, 1:]
+    us_state_abbrev = load_pickle('data/state_abbrev.pickle')
+    df_vaccine['state'].replace(us_state_abbrev, inplace=True)
+
+
+    # Total sum per column:
+    df_vaccine.loc['Total', 1:] = df_vaccine.iloc[:, 1:].sum(axis=0)
+
+    # Total sum per row:
+    df_vaccine.loc[:, 'Total'] = df_vaccine.iloc[:, 1:].sum(axis=1)
+
+    # Fix stupid float bug.
+    cols = list(df_vaccine.columns.values)
+    cols = cols[1:]
+    type_dict = dict(zip(cols, ['int64'] * len(cols)))
+    df_vaccine = df_vaccine.astype(type_dict)
+
+    return df_vaccine

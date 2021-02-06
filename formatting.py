@@ -38,8 +38,6 @@ try:
 
 except FileNotFoundError:
 
-
-
     # Reformat to needed columns, and column labels that are datetime ready
     # strings. Column labels are all moved to 'week ending on' the date, which is
     # a saturday, to conform to other CDC data.
