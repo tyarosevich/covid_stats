@@ -293,18 +293,61 @@ def get_total_frame(df1, df2):
 
     return df_vaccine
 
-def get_vacc_fig(df):
+def get_vacc_fig(df, dropdown):
+    if dropdown == 'total':
+        col='Total_x'
+        colorbar = 'Vaccines Shipped'
+        title = '2020-2021 Doses Shipped by State'
+    else:
+        col='log_relative'
+        colorbar='Vaccines Shipped Per Covid Death (log scale)'
+        title = '2020-2021 Doses Shipped per Death by State (Note AL, HI, and NC have been normalized for the heatmap)'
+    max = np.sort(df['relative'])[-4]
+    # Arbitrarily setting these states to the fourth highest * 2 so the
+    # so that the heat map is intelligible
+    df.loc['North Carolina', 'relative'] = max
+    df.loc['Alaska', 'relative'] = max
+    df.loc['Hawaii', 'relative'] = max
+    df['log_relative'] = np.log(df['relative'])
+
     fig = go.Figure(data=go.Choropleth(
         locations=df['state'],  # Column with two-letter state abbrevs.
-        z=df['Total'].iloc[0:-1].astype(float),  # State vaccine totals.
+        z=df[col].iloc[0:-1].astype(float),  # State vaccine totals.
         locationmode='USA-states',  # set of locations match entries in `locations`
         colorscale='Blues',
-        colorbar_title="Vaccine Doses Shipped",
+        colorbar_title=colorbar,
     ))
 
     fig.update_layout(
-        title_text='2020-2021 Vaccines Shipped by State',
+        title_text=title,
         title_x=0.5,
         geo_scope='usa',  # limit map scope to USA
     )
     return fig
+
+def total_rows_columns(df):
+    # Total sum per column:
+    df.loc['Total', 1:] = df.iloc[:, 1:].sum(axis=0)
+
+    # Total sum per row:
+    df.loc[:, 'Total'] = df.iloc[:, 1:].sum(axis=1)
+
+    return df
+
+def get_df_pop_and_deaths(df1, df2, df3):
+    # df1 = vaccine, df2 = population, df3 = deaths
+    df_vacc_withpop = df1.join(df2, how='inner')
+
+    df_vacc_withpop.drop('abbrev', axis=1, inplace=True)
+    df_vacc_withpop['per1000'] = df_vacc_withpop['Total'] / df_vacc_withpop['2019'] * 1000
+    df_deaths_wtotals = total_rows_columns(df3)
+    df_totals_asframe = df_deaths_wtotals['Total'].to_frame()
+
+    df_totals_asframe['Total_deaths'] = df_totals_asframe['Total'].astype('int32')
+
+    df_vacc_withpop_and_deaths = df_vacc_withpop.merge(df_totals_asframe, how='inner', left_index=True,
+                                                       right_index=True)
+
+    # Create a column for doses per death
+    df_vacc_withpop_and_deaths['relative'] = df_vacc_withpop_and_deaths['Total_x'] / (df_vacc_withpop_and_deaths['Total_deaths'] + .01)
+    return df_vacc_withpop_and_deaths
