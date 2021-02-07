@@ -24,19 +24,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 application = app.server
 
 # Call the USA fig
-fig = go.Figure(data=go.Choropleth(
-    locations=df_vaccine['state'],  # Column with two-letter state abbrevs.
-    z=df_vaccine['Total'].iloc[0:-1].astype(float),  # State vaccine totals.
-    locationmode='USA-states',  # set of locations match entries in `locations`
-    colorscale='Blues',
-    colorbar_title="Vaccine Doses Shipped",
-))
-
-fig.update_layout(
-    title_text='2020-2021 Vaccines Shipped by State',
-    title_x = 0.5,
-    geo_scope='usa',  # limit map scope to USA
-)
+fig = utils.get_vacc_fig(df_vaccine)
 
 app.title='Covid-19 Vaccination-Mortality Correlation Data'
 

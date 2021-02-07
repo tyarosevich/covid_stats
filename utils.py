@@ -4,6 +4,16 @@ import datetime as dt
 import pandas as pd
 from sodapy import Socrata
 import numpy as np
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import plotly.express as px
+from dash.dependencies import Input, Output
+import os
+import configparser
+import plotly.graph_objects as go
+from scipy.stats import spearmanr
+import dash_bootstrap_components as dbc
 
 def load_pickle(path):
     '''
@@ -282,3 +292,19 @@ def get_total_frame(df1, df2):
     df_vaccine = df_vaccine.astype(type_dict)
 
     return df_vaccine
+
+def get_vacc_fig(df):
+    fig = go.Figure(data=go.Choropleth(
+        locations=df['state'],  # Column with two-letter state abbrevs.
+        z=df['Total'].iloc[0:-1].astype(float),  # State vaccine totals.
+        locationmode='USA-states',  # set of locations match entries in `locations`
+        colorscale='Blues',
+        colorbar_title="Vaccine Doses Shipped",
+    ))
+
+    fig.update_layout(
+        title_text='2020-2021 Vaccines Shipped by State',
+        title_x=0.5,
+        geo_scope='usa',  # limit map scope to USA
+    )
+    return fig
