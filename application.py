@@ -56,6 +56,7 @@ app.layout = html.Div([
            dcc.Graph(id='scatter')#, sm=5
         )
     ])
+    # Code to check the mouseover output.
     # html.Div(className='row', children=[
     #     html.Div([
     #         dcc.Markdown("""
@@ -86,6 +87,7 @@ def update_scatter(hover):
     fig = utils.get_scatter(df_vaccine, df_covid_deaths, state)
     return fig
 
+# Code to check the mouseover output.
 # @app.callback(
 #     Output('hover-data', 'children'),
 #     Input('usa1', 'hoverData'))
