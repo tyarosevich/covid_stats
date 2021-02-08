@@ -25,6 +25,8 @@ df_vacc_withpop_deaths = utils.get_df_pop_and_deaths(df_vaccine, df_population, 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 application = app.server
+state_to_abbrev = utils.load_pickle('data/state_abbrev.pickle')
+abbrev_to_state = {b:a for a,b in state_to_abbrev.items()}
 
 # # Call the USA fig
 # fig = utils.get_vacc_fig(df_vaccine)
@@ -42,7 +44,7 @@ app.layout = html.Div([
             dcc.Dropdown(
                 id='usa1_dropdown',
                 options = [{'label': 'Total Vaccinations Per State', 'value':'total'},
-                           {'label':'Vaccinations Per 1,000 Residents', 'value':'relative'}],
+                           {'label':'Vaccinations Shipped Per Covid Fatality Per State', 'value':'relative'}],
                 value= 'total'
             ),
         width=6)
@@ -50,10 +52,15 @@ app.layout = html.Div([
     # Mouseover U.S. Map
     dbc.Row([
         dbc.Col(
-            dcc.Graph(id='usa1')# , sm=5
+            dcc.Graph(id='usa1'), width=6
         ),
         dbc.Col(
-           dcc.Graph(id='scatter')#, sm=5
+           dcc.Graph(id='full_scatter', figure=utils.get_full_scatter(df_vaccine, df_covid_deaths)), width=6
+        )
+    ]),
+    dbc.Row([
+        dbc.Col(
+           dcc.Graph(id='scatter'), width=6
         )
     ])
     # Code to check the mouseover output.
@@ -81,10 +88,12 @@ def update_usa1(dropdown):
 def update_scatter(hover):
     # Put initial value to CA.
     if hover == None:
-        state = 'CA'
+        abbrev = 'CA'
     else:
-        state = hover['points'][0]['location']
-    fig = utils.get_scatter(df_vaccine, df_covid_deaths, state)
+        abbrev = hover['points'][0]['location']
+    state = abbrev_to_state[abbrev]
+    pop = df_population.loc[state, '2019']
+    fig = utils.get_scatter(df_vaccine, df_covid_deaths, abbrev, pop)
     return fig
 
 # Code to check the mouseover output.

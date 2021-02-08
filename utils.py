@@ -280,7 +280,7 @@ def get_total_frame(df1, df2):
 
 
     # Total sum per column:
-    df_vaccine.loc['Total', 1:] = df_vaccine.iloc[:, 1:].sum(axis=0)
+    df_vaccine.loc['Total', df_vaccine.columns[1:]] = df_vaccine.iloc[:, 1:].sum(axis=0)
 
     # Total sum per row:
     df_vaccine.loc[:, 'Total'] = df_vaccine.iloc[:, 1:].sum(axis=1)
@@ -352,13 +352,78 @@ def get_df_pop_and_deaths(df1, df2, df3):
     df_vacc_withpop_and_deaths['relative'] = df_vacc_withpop_and_deaths['Total_x'] / (df_vacc_withpop_and_deaths['Total_deaths'] + .01)
     return df_vacc_withpop_and_deaths
 
-def get_scatter(df1, df2, abbrev):
+def get_scatter(df1, df2, abbrev, pop):
     df_scatter = pd.DataFrame
     idx = df1.index[df1['state'] == abbrev]
     df_scatter = df1.loc[idx].iloc[0, 1:].to_frame()
     df_scatter['y'] = df2.loc[idx].iloc[0, 1:]
     df_scatter.rename(columns={df_scatter.columns[0]: 'x'}, inplace=True)
-    fig = px.scatter(df_scatter,
-                     x='x',
-                     y='y')
+    df_scatter.drop('Total', axis=0, inplace=True)
+    df_scatter = df_scatter.cumsum(skipna=True)
+    df_scatter['y'] = df_scatter['y'] / pop * 1000
+    fig = go.Figure(data=go.Scattergl(
+        x=df_scatter['x'],
+        y=df_scatter['y'],
+        mode='markers',
+        marker=dict(
+            color=np.random.randn(1000),
+            colorscale='Blues',
+            line_width=1
+        )
+    ))
+    fig.update_layout(
+        title='Vaccine Doses Shipped vs Covid-19 Deaths Per 1000 Population in {}'.format(abbrev),
+        title_x=0.5,
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#F0F8FF'
+    )
+
+    return fig
+
+def get_full_scatter(df1, df2):
+    '''
+    Returns a px.scatter figure for all vaccine shipments
+    and covid deaths in the available data (all states).
+    :param df1: DataFrame
+    The vaccine shipment frame.
+    :param df2: DataFrame
+    The covid deaths frame.
+    :return: figure
+    '''
+    # Drop totals, stack rows into a series, and make a dataframe for plotting.
+    df_prep = df1.drop(['state', 'Total'], axis=1)
+    df_prep.drop('Total', axis=0, inplace=True)
+    df_prep = df_prep.cumsum(axis=1, skipna=True)
+    x_list = df_prep.stack(dropna=False)
+    df_prep2 = df2.drop(['state', 'Total'], axis=1)
+    df_prep2.drop('Total', axis=0, inplace=True)
+    df_prep2= df_prep2.cumsum(axis=1, skipna=True)
+    y_list = df_prep2.stack(dropna=False)
+    s_state = x_list.index.to_list()
+    state_list = [tup[0] for tup in s_state]
+    df_full_scatter = pd.DataFrame([x_list, y_list]).transpose().rename(columns={0:'x', 1:'y'})
+    df_full_scatter['label'] = state_list
+
+    # fig = px.scatter(df_full_scatter,
+    #                  x='x',
+    #                  y='y')
+    fig = go.Figure(data=go.Scattergl(
+        x=df_full_scatter['x'],
+        y=df_full_scatter['y'],
+        mode='markers',
+        text=df_full_scatter['label'],
+        marker=dict(
+            color=np.random.randn(1000),
+            colorscale='Blues',
+            line_width=1
+        )
+    ))
+    fig.update_layout(
+        title='Cumulative Vaccine Shipments and Deaths for all States',
+        title_x=0.5,
+        xaxis_title='Doses Shipped',
+        yaxis_title='Known deaths caused by Covid-19',
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#F0F8FF'
+    )
     return fig
