@@ -11,10 +11,10 @@ import plotly.graph_objects as go
 from scipy.stats import spearmanr
 import dash_bootstrap_components as dbc
 import json
-
+from sodapy import Socrata
 
 # Get the dataframes and combine vaccine totals
-formatted_list = utils.get_current_data()
+formatted_list = utils.update_frames()
 df_pfizer = formatted_list[0]
 df_moderna = formatted_list[1]
 df_covid_deaths = formatted_list[2]

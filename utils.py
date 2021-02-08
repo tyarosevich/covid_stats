@@ -47,7 +47,7 @@ def save_pickle(path, item):
 
 def fix_date_label(input_string, stamp = False, shift = 0):
     '''
-    Converts the CDI API output labels to timestamps
+    Converts the CDC API output labels to timestamps
     :param input_string: str
         The column head from the API's output.
     :param stamp: bool
@@ -98,8 +98,10 @@ def clean_frame(df, type):
     # representing 'week ending on this day'. All dates forced up to the next saturday.
     if type == 'covid_deaths':
         # Drop unneeded columns and drop rows from before vaccine distribution began.
+        df['week_ending_date'] = df['week_ending_date'].apply(
+            dt.date.fromisoformat)
         df['mmwrweek'] = pd.to_numeric(df['mmwrweek'])
-        df = df[df['mmwrweek'] > 47]
+        df = df[df['week_ending_date'] > dt.date.fromisoformat('2020-12-18')]
         columns = list(df.columns.values)
         try:
             keep_columns = columns[0:4] + columns[17:19]
@@ -114,8 +116,6 @@ def clean_frame(df, type):
         columns = list(df.columns.values)
         int_columns = columns[1:3] + columns[4:]
         df[int_columns] = df[int_columns].apply(pd.to_numeric)
-        df['week_ending_date'] = df['week_ending_date'].apply(
-            dt.date.fromisoformat)
         df['week_ending_date'] = df['week_ending_date'].apply(normalize_day)
         return df
 
@@ -197,16 +197,61 @@ def correct_bad_aggreg(df_old, df_format):
     df_new = df_new.loc[state_names, :]
     return df_new
 
-def update_frames(list_frames, client):
-    df_pfizer = list_frames[0]
-    df_moderna = list_frames[1]
-    df_deaths = list_frames[2]
-    df_pfizer_new = pfiz_mod_updates(df_pfizer, client)
-    df_moderna_new = pfiz_mod_updates(df_moderna, client)
-    df_deaths_new = covid_deaths_updates(df_deaths, df_pfizer, client)
+def update_frames():
 
-    return [df_pfizer_new, df_moderna_new, df_deaths_new]
+    # Old attempt at dynamic update.
+    # df_pfizer = list_frames[0]
+    # df_moderna = list_frames[1]
+    # df_deaths = list_frames[2]
+    # df_pfizer_new = pfiz_mod_updates(df_pfizer, client)
+    # df_moderna_new = pfiz_mod_updates(df_moderna, client)
+    # df_deaths_new = covid_deaths_updates(df_deaths, df_pfizer, client)
+    #
+    # return [df_pfizer_new, df_moderna_new, df_deaths_new]
 
+    # Easier to just grab JSONs again, they are small.
+
+    # Get the day of the week and load the update completed flag.
+    # (this is a hacky work around to using a lib for such a simple task).
+    flag = load_pickle('data/flag.pickle')
+    today = dt.date.today()
+    day_of_week = today.weekday()
+    # If it's monday, run update and flag the update as done.
+    if day_of_week == 0 and flag ==0:
+        flag = 1
+        save_pickle('data/flag.pickle', flag)
+        client = Socrata("data.cdc.gov", None)
+        # Get jsons from CDC
+        results_pfizer = client.get("saz5-9hgg", limit=1000)
+        results_moderna = client.get("b7pe-5nws", limit=1000)
+        covid_deaths = client.get("muzy-jte6", limit=6000)
+
+        # Convert to pandas DataFrame
+        df_pfizer = pd.DataFrame.from_records(results_pfizer)
+        df_moderna = pd.DataFrame.from_records(results_moderna)
+        df_covid_deaths = pd.DataFrame.from_records(covid_deaths)
+
+        # Reformat to needed columns, and column labels that are datetime ready
+        # strings. Column labels are all moved to 'week ending on' the date, which is
+        # a saturday, to conform to other CDC data.
+        df_pfizer_formatted = clean_frame(df_pfizer, 'pfizer')
+        df_moderna_formatted = clean_frame(df_moderna, 'moderna')
+
+        # Totally clean, re-format and re-aggregate this disaster of a dataset. Pfizer frame
+        # is passed as template.
+        df_covid_deaths_formatted = correct_bad_aggreg(clean_frame(df_covid_deaths, 'covid_deaths'),
+                                                             df_pfizer_formatted)
+        frame_list = [df_pfizer_formatted, df_moderna_formatted, df_covid_deaths_formatted]
+        # Save formatted data
+        save_pickle('data/formatted_data.pickle', frame_list)
+
+        return frame_list
+    # If it's not monday, flag for update.
+    else:
+        flag = 0
+        save_pickle('data/flag.pickle', flag)
+        frame_list = load_pickle('data/formatted_data.pickle')
+        return frame_list
 
 
 def pfiz_mod_updates(df_old, client):
