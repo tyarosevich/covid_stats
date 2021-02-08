@@ -351,3 +351,14 @@ def get_df_pop_and_deaths(df1, df2, df3):
     # Create a column for doses per death
     df_vacc_withpop_and_deaths['relative'] = df_vacc_withpop_and_deaths['Total_x'] / (df_vacc_withpop_and_deaths['Total_deaths'] + .01)
     return df_vacc_withpop_and_deaths
+
+def get_scatter(df1, df2, abbrev):
+    df_scatter = pd.DataFrame
+    idx = df1.index[df1['state'] == abbrev]
+    df_scatter = df1.loc[idx].iloc[0, 1:].to_frame()
+    df_scatter['y'] = df2.loc[idx].iloc[0, 1:]
+    df_scatter.rename(columns={df_scatter.columns[0]: 'x'}, inplace=True)
+    fig = px.scatter(df_scatter,
+                     x='x',
+                     y='y')
+    return fig
