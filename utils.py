@@ -436,7 +436,7 @@ def get_fatality_rate(df1, df2):
     cols = list(df2.columns.values)
     df_fatality_rate = pd.DataFrame(index=indexes, columns=cols)
     df_fatality_rate['abbrev'] = df1['abbrev']
-    df_fatality_rate.iloc[:, 1:] = df1.iloc[:, 1:] / df2.iloc[:, 1:]
+    df_fatality_rate.iloc[:, 1:] = df1.iloc[:, 1:] / (df2.iloc[:, 1:] +.00001)
 
     return df_fatality_rate
 

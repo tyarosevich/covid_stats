@@ -14,17 +14,16 @@ import dash_bootstrap_components as dbc
 import json
 from sodapy import Socrata
 
-#######################
-####################  Try switching to vaccination shipment *rate*.
-#####################
 # Get the dataframes and combine vaccine totals
 formatted_list = utils.update_frames()
 df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate = formatted_list
 df_vaccine = utils.get_total_frame(df_pfizer, df_moderna)
 abbrev_to_state= utils.load_pickle('data/state_abbrev.pickle')
+df_case_total = utils.get_frame_totals(df_cases)
+df_death_total = utils.get_frame_totals(df_deaths)
+abbrev_to_state= utils.load_pickle('data/state_abbrev.pickle')
 state_to_abbrev  = {b:a for a,b in abbrev_to_state.items()}
-state_to_abbrev = utils.load_pickle('data/state_abbrev.pickle')
-abbrev_to_state = {b:a for a,b in state_to_abbrev.items()}
+
 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -58,7 +57,7 @@ app.layout = html.Div([
             dcc.Graph(id='usa1'), width=6
         ),
         dbc.Col(
-           dcc.Graph(id='full_scatter', figure=dash_utils.get_full_scatter(df_vaccine, df_covid_deaths)), width=6
+           dcc.Graph(id='overlay', figure={}), width=6
         )
     ]),
     dbc.Row([
@@ -78,14 +77,16 @@ app.layout = html.Div([
     #     ], className='three columns')])
 ])
 
+
 # Retrieves a figure to output the geographical heatmap of the US based
 # on the dropdown value.
 @app.callback(Output('usa1','figure'), Input('usa1_dropdown', 'value'))
 def update_usa1(dropdown):
     if dropdown == None:
         dropdown = 'total'
-    fig = dash_utils.get_vacc_fig(df_vacc_withpop_deaths, dropdown)
+    fig = dash_utils.get_usa_fig(df_vaccine, df_case_total, dropdown)
     return fig
+
 
 @app.callback(Output('scatter', 'figure'), Input('usa1', 'hoverData'))
 def update_scatter(hover):
@@ -96,6 +97,19 @@ def update_scatter(hover):
         abbrev = hover['points'][0]['location']
     state = abbrev_to_state[abbrev]
     fig = dash_utils.get_scatter(df_vaccine, df_fatality_rate, state, abbrev)
+    return fig
+
+
+@app.callback(Output('overlay', 'figure'), [Input('usa1', 'hoverData')])
+def update_overlay(hover1):
+    # Put initial value to CA.
+    if hover1 == None:
+        abbrev = 'U.S.'
+        state = 'Total'
+    else:
+        abbrev = hover1['points'][0]['location']
+        state = abbrev_to_state[abbrev]
+    fig = dash_utils.get_overlay_fig(df_vaccine, df_case_total, df_death_total, state, abbrev)
     return fig
 
 # Code to check the mouseover output.

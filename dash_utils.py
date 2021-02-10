@@ -32,18 +32,18 @@ def get_scatter(df1, df2, state, abbrev):
     :return:
     '''
     # Create plotting frame with x/y values only.
-    df_scatter = pd.DataFrame()
-    df_scatter['x'] = df1.loc['state'].iloc[1:-1]
-    df_scatter.reset_index(drop=True, inplace=True)
+    # df_scatter = pd.DataFrame()
+    # df_scatter['x'] = df1.loc[state].iloc[1:-1]
+    # df_scatter.reset_index(drop=True, inplace=True)
     # For some reason stupid ass pandas won't take this series assignment, hence np.
-    df_scatter['y'] = df2.loc['state'].iloc[1:].to_numpy()
+    # df_scatter['y'] = df2.loc['state'].iloc[1:].to_numpy()
 
     # Take the running total of vaccine production since what we're
     # correlating is the overall effect of vaccination.
-    df_scatter['x'] = df_scatter['x'].cumsum()
+    # df_scatter['x'] = df_scatter['x'].cumsum()
     fig = go.Figure(data=go.Scattergl(
-        x=df_scatter['x'],
-        y=df_scatter['y'],
+        x=df1.loc[state].iloc[1:-1].cumsum(),
+        y=df2.loc[state].iloc[1:],
         mode='markers',
         marker=dict(
             color=np.random.randn(1000),
@@ -77,7 +77,7 @@ def get_full_scatter(df1, df2):
     x_list = df_prep.stack(dropna=False)
     df_prep2 = df2.drop(['abbrev', 'Total'], axis=1)
     df_prep2.drop('Total', axis=0, inplace=True)
-    df_prep2= df_prep2.cumsum(axis=1, skipna=True)
+    df_prep2 = df_prep2.cumsum(axis=1, skipna=True)
     y_list = df_prep2.stack(dropna=False)
     s_state = x_list.index.to_list()
     state_list = [tup[0] for tup in s_state]
@@ -108,26 +108,26 @@ def get_full_scatter(df1, df2):
     )
     return fig
 
-def get_vacc_fig(df, dropdown):
+def get_usa_fig(df1, df2, dropdown):
     if dropdown == 'total':
-        col='Total_x'
+        col=df1['Total']
         colorbar = 'Vaccines Shipped'
         title = '2020-2021 Doses Shipped by State'
     else:
-        col='log_relative'
-        colorbar='Vaccines Shipped Per Covid Death (log scale)'
-        title = '2020-2021 Doses Shipped per Death by State (Note AL, HI, and NC have been normalized for the heatmap)'
-    max = np.sort(df['relative'])[-4]
+        col=np.log(df1['Total'] / (df2['Total'] + .01))
+        colorbar='Vaccines Shipped Per Covid Case (Log scale)'
+        title = '2020-2021 Doses Shipped per Case by State (Log scale)'
+    # max = np.sort(df['relative'])[-4]
     # Arbitrarily setting these states to the fourth highest * 2 so the
     # so that the heat map is intelligible
-    df.loc['North Carolina', 'relative'] = max
-    df.loc['Alaska', 'relative'] = max
-    df.loc['Hawaii', 'relative'] = max
-    df['log_relative'] = np.log(df['relative'])
+    # df.loc['North Carolina', 'relative'] = max
+    # df.loc['Alaska', 'relative'] = max
+    # df.loc['Hawaii', 'relative'] = max
+    # df['log_relative'] = np.log(df['relative'])
 
     fig = go.Figure(data=go.Choropleth(
-        locations=df['state'],  # Column with two-letter state abbrevs.
-        z=df[col].iloc[0:-1].astype(float),  # State vaccine totals.
+        locations=df1['abbrev'],  # Column with two-letter state abbrevs.
+        z=col.iloc[0:-1].astype(float),  # State vaccine totals.
         locationmode='USA-states',  # set of locations match entries in `locations`
         colorscale='Blues',
         colorbar_title=colorbar,
@@ -138,4 +138,51 @@ def get_vacc_fig(df, dropdown):
         title_x=0.5,
         geo_scope='usa',  # limit map scope to USA
     )
+    return fig
+
+def get_overlay_fig(df1, df2, df3, state, abbrev):
+    '''
+    Returns a log scale overlay of the vaccine running total, cases, deaths.
+    :param df1: DataFrame
+    The vaccination frame.
+    :param df2: DataFrame
+    The cases frame.
+    :param df3: DataFrame
+    The deaths frame
+    :param state: str
+    The state (or United States) in question.
+    :param abbrev: str
+    State abbreviation
+    :return: Figure
+    '''
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=list(df1.columns.values), y=np.log(df1.loc[state].iloc[1:-1].cumsum().astype(float)),
+        fillcolor='#B0E2FF',
+        line_color='#FFFFFF',
+        fill='tozeroy',
+        name='Vaccinations'
+    ))
+    fig.add_trace(go.Scatter(
+        x=list(df1.columns.values), y=np.log(df2.loc[state].iloc[1:-1].astype(float)),
+        fillcolor='#87CEFA',
+        line_color='#87CEEB',
+        fill='tozeroy',
+        name='Cases'
+    ))
+    fig.add_trace(go.Scatter(
+        x=list(df1.columns.values), y=np.log(df3.loc[state].iloc[1:-1].astype(float)),
+        fillcolor='#6CA6CD',
+        line_color='#6495ED',
+        fill='tozeroy',
+        name='Deaths'
+    ))
+
+    fig.update_layout(
+        title='Vaccines Shipped / Cases / Deaths Overlay for {} (Log Scale)'.format(abbrev),
+        title_x=0.5,
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#F0F8FF'
+    )
+
     return fig
