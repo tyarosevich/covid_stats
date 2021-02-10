@@ -12,7 +12,7 @@ from dash.dependencies import Input, Output
 import os
 import configparser
 import plotly.graph_objects as go
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, linregress, pearsonr
 import dash_bootstrap_components as dbc
 
 
@@ -31,31 +31,35 @@ def get_scatter(df1, df2, state, abbrev):
     Abbreviation for the title.
     :return:
     '''
-    # Create plotting frame with x/y values only.
-    # df_scatter = pd.DataFrame()
-    # df_scatter['x'] = df1.loc[state].iloc[1:-1]
-    # df_scatter.reset_index(drop=True, inplace=True)
-    # For some reason stupid ass pandas won't take this series assignment, hence np.
-    # df_scatter['y'] = df2.loc['state'].iloc[1:].to_numpy()
-
-    # Take the running total of vaccine production since what we're
-    # correlating is the overall effect of vaccination.
-    # df_scatter['x'] = df_scatter['x'].cumsum()
+    x_arr = df1.loc[state].iloc[1:-1].cumsum().to_numpy().astype(float)
+    y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
+    regress_obj = linregress(x_arr, y_arr)
+    y_regr = regress_obj.intercept + regress_obj.slope * x_arr
     fig = go.Figure(data=go.Scattergl(
-        x=df1.loc[state].iloc[1:-1].cumsum(),
-        y=df2.loc[state].iloc[1:],
+        x=x_arr,
+        y=y_arr,
         mode='markers',
         marker=dict(
             color=np.random.randn(1000),
             colorscale='Blues',
-            line_width=1
+            line_width=1,
+            size=8
         )
     ))
+    fig.add_trace(go.Scatter(
+        x=x_arr,
+        y=y_regr,
+        mode='lines',
+        line_color='#6CA6CD',
+        name='linear regression p={}'.format(round(regress_obj.pvalue, 4))
+    ))
+
     fig.update_layout(
         title='Vaccine Doses Shipped vs Covid-19 Fatality Rate in {}'.format(abbrev),
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
+        plot_bgcolor='#F0F8FF',
+        showlegend=False
     )
 
     return fig
@@ -186,3 +190,11 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
     )
 
     return fig
+
+def get_pearson(df1, df2, state, abbrev):
+    x_arr = df1.loc[state].iloc[1:-1].cumsum().to_numpy().astype(float)
+    y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
+    pearson_obj = pearsonr(x_arr, y_arr)
+    r = round(pearson_obj[0], 4)
+    report = 'The Pearson correlation for the data from {} is r={}'.format(abbrev, r)
+    return report
