@@ -43,12 +43,16 @@ except FileNotFoundError:
     # a saturday, to conform to other CDC data.
     df_pfizer_formatted = utils.clean_frame(df_pfizer, 'pfizer')
     df_moderna_formatted = utils.clean_frame(df_moderna, 'moderna')
-
+    df_cases, df_deaths = utils.get_case_deaths(df_pfizer_formatted)
+    df_fatality_rate = utils.get_fatality_rate(df_deaths, df_cases)
+    frame_list = [df_pfizer_formatted, df_moderna_formatted, df_cases, df_deaths, df_fatality_rate]
+    # Save formatted data
+    utils.save_pickle('data/formatted_data.pickle', frame_list)
     # Totally clean, re-format and re-aggregate this disaster of a dataset. Pfizer frame
     # is passed as template.
-    df_covid_deaths_formatted = utils.correct_bad_aggreg(utils.clean_frame(df_covid_deaths, 'covid_deaths'), df_pfizer_formatted)
+    # df_covid_deaths_formatted = utils.correct_bad_aggreg(utils.clean_frame(df_covid_deaths, 'covid_deaths'), df_pfizer_formatted)
     # Save formatted data
-    utils.save_pickle('data/formatted_data.pickle', [df_pfizer_formatted, df_moderna_formatted, df_covid_deaths_formatted])
+
 
 
 

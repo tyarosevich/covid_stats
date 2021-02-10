@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 from dash.dependencies import Input, Output
 import utils
+import dash_utils
 import os
 import configparser
 import plotly.graph_objects as go
@@ -13,20 +14,22 @@ import dash_bootstrap_components as dbc
 import json
 from sodapy import Socrata
 
+#######################
+####################  Try switching to vaccination shipment *rate*.
+#####################
 # Get the dataframes and combine vaccine totals
 formatted_list = utils.update_frames()
-df_pfizer = formatted_list[0]
-df_moderna = formatted_list[1]
-df_covid_deaths = formatted_list[2]
+df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate = formatted_list
 df_vaccine = utils.get_total_frame(df_pfizer, df_moderna)
-df_population = utils.load_pickle('data/df_population.pickle')
-df_vacc_withpop_deaths = utils.get_df_pop_and_deaths(df_vaccine, df_population, df_covid_deaths)
+abbrev_to_state= utils.load_pickle('data/state_abbrev.pickle')
+state_to_abbrev  = {b:a for a,b in abbrev_to_state.items()}
+state_to_abbrev = utils.load_pickle('data/state_abbrev.pickle')
+abbrev_to_state = {b:a for a,b in state_to_abbrev.items()}
 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 application = app.server
-state_to_abbrev = utils.load_pickle('data/state_abbrev.pickle')
-abbrev_to_state = {b:a for a,b in state_to_abbrev.items()}
+
 
 # # Call the USA fig
 # fig = utils.get_vacc_fig(df_vaccine)
@@ -55,7 +58,7 @@ app.layout = html.Div([
             dcc.Graph(id='usa1'), width=6
         ),
         dbc.Col(
-           dcc.Graph(id='full_scatter', figure=utils.get_full_scatter(df_vaccine, df_covid_deaths)), width=6
+           dcc.Graph(id='full_scatter', figure=dash_utils.get_full_scatter(df_vaccine, df_covid_deaths)), width=6
         )
     ]),
     dbc.Row([
@@ -81,7 +84,7 @@ app.layout = html.Div([
 def update_usa1(dropdown):
     if dropdown == None:
         dropdown = 'total'
-    fig = utils.get_vacc_fig(df_vacc_withpop_deaths, dropdown)
+    fig = dash_utils.get_vacc_fig(df_vacc_withpop_deaths, dropdown)
     return fig
 
 @app.callback(Output('scatter', 'figure'), Input('usa1', 'hoverData'))
@@ -92,8 +95,7 @@ def update_scatter(hover):
     else:
         abbrev = hover['points'][0]['location']
     state = abbrev_to_state[abbrev]
-    pop = df_population.loc[state, '2019']
-    fig = utils.get_scatter(df_vaccine, df_covid_deaths, abbrev, pop)
+    fig = dash_utils.get_scatter(df_vaccine, df_fatality_rate, state, abbrev)
     return fig
 
 # Code to check the mouseover output.

@@ -4,16 +4,6 @@ import datetime as dt
 import pandas as pd
 from sodapy import Socrata
 import numpy as np
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import plotly.express as px
-from dash.dependencies import Input, Output
-import os
-import configparser
-import plotly.graph_objects as go
-from scipy.stats import spearmanr
-import dash_bootstrap_components as dbc
 
 def load_pickle(path):
     '''
@@ -93,6 +83,8 @@ def clean_frame(df, type):
                    "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon",
                    "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
                    "Utah", "Virginia", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
+    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
 
     # Drops unnecessary columns, and renames date columns to a string timestamp
     # representing 'week ending on this day'. All dates forced up to the next saturday.
@@ -148,6 +140,8 @@ def clean_frame(df, type):
     # Set the index to the state.
     df.set_index('state', drop=False, inplace=True)
     df = df.loc[state_names, :]
+    df.rename(columns={df.columns[0]: "abbrev"}, inplace=True)
+    df['abbrev'] = df['abbrev'].apply(lambda x: state_to_abbrev[x])
     return df
 def normalize_day(date):
     '''
@@ -182,10 +176,10 @@ def correct_bad_aggreg(df_old, df_format):
     # Format the new df using df_format as a template.
     col_labels = list(df_format.columns.values)
     df_new = pd.DataFrame(columns=col_labels)
-    df_new['state'] = df_format['state']
+    df_new['abbrev'] = df_format['abbrev']
 
     # Create sets to make sure old format has the data.
-    state_set = set(df_format['state'])
+    state_set = set(df_format['abbrev'])
     date_set = set(list(df_format.columns.values)[1:])
 
     # iterate through the old frame to update the new one.
@@ -224,12 +218,12 @@ def update_frames():
         # Get jsons from CDC
         results_pfizer = client.get("saz5-9hgg", limit=1000)
         results_moderna = client.get("b7pe-5nws", limit=1000)
-        covid_deaths = client.get("muzy-jte6", limit=6000)
+        # covid_deaths = client.get("muzy-jte6", limit=6000)
 
         # Convert to pandas DataFrame
         df_pfizer = pd.DataFrame.from_records(results_pfizer)
         df_moderna = pd.DataFrame.from_records(results_moderna)
-        df_covid_deaths = pd.DataFrame.from_records(covid_deaths)
+        # df_covid_deaths = pd.DataFrame.from_records(covid_deaths)
 
         # Reformat to needed columns, and column labels that are datetime ready
         # strings. Column labels are all moved to 'week ending on' the date, which is
@@ -239,9 +233,12 @@ def update_frames():
 
         # Totally clean, re-format and re-aggregate this disaster of a dataset. Pfizer frame
         # is passed as template.
-        df_covid_deaths_formatted = correct_bad_aggreg(clean_frame(df_covid_deaths, 'covid_deaths'),
-                                                             df_pfizer_formatted)
-        frame_list = [df_pfizer_formatted, df_moderna_formatted, df_covid_deaths_formatted]
+        # df_covid_deaths_formatted = correct_bad_aggreg(clean_frame(df_covid_deaths, 'covid_deaths'),
+                                                             # df_pfizer_formatted)
+
+        df_cases, df_deaths = get_case_deaths(df_pfizer_formatted)
+        df_fatality_rate = get_fatality_rate(df_deaths, df_cases)
+        frame_list = [df_pfizer_formatted, df_moderna_formatted, df_cases, df_deaths, df_fatality_rate]
         # Save formatted data
         save_pickle('data/formatted_data.pickle', frame_list)
 
@@ -320,8 +317,9 @@ def get_total_frame(df1, df2):
     # Combine the two dataframes and replace states with abbrevs.
     df_vaccine = df1
     df_vaccine.iloc[:, 2:] += df2.iloc[:, 1:]
-    us_state_abbrev = load_pickle('data/state_abbrev.pickle')
-    df_vaccine['state'].replace(us_state_abbrev, inplace=True)
+    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
+    # df_vaccine['state'].replace(state_to_abbrev, inplace=True)
 
 
     # Total sum per column:
@@ -338,37 +336,6 @@ def get_total_frame(df1, df2):
 
     return df_vaccine
 
-def get_vacc_fig(df, dropdown):
-    if dropdown == 'total':
-        col='Total_x'
-        colorbar = 'Vaccines Shipped'
-        title = '2020-2021 Doses Shipped by State'
-    else:
-        col='log_relative'
-        colorbar='Vaccines Shipped Per Covid Death (log scale)'
-        title = '2020-2021 Doses Shipped per Death by State (Note AL, HI, and NC have been normalized for the heatmap)'
-    max = np.sort(df['relative'])[-4]
-    # Arbitrarily setting these states to the fourth highest * 2 so the
-    # so that the heat map is intelligible
-    df.loc['North Carolina', 'relative'] = max
-    df.loc['Alaska', 'relative'] = max
-    df.loc['Hawaii', 'relative'] = max
-    df['log_relative'] = np.log(df['relative'])
-
-    fig = go.Figure(data=go.Choropleth(
-        locations=df['state'],  # Column with two-letter state abbrevs.
-        z=df[col].iloc[0:-1].astype(float),  # State vaccine totals.
-        locationmode='USA-states',  # set of locations match entries in `locations`
-        colorscale='Blues',
-        colorbar_title=colorbar,
-    ))
-
-    fig.update_layout(
-        title_text=title,
-        title_x=0.5,
-        geo_scope='usa',  # limit map scope to USA
-    )
-    return fig
 
 def total_rows_columns(df):
     # Total sum per column:
@@ -381,7 +348,7 @@ def total_rows_columns(df):
 
 def get_df_pop_and_deaths(df1, df2, df3):
     # df1 = vaccine, df2 = population, df3 = deaths
-    df_vacc_withpop = df1.join(df2, how='inner')
+    df_vacc_withpop = df1.merge(df2, how='inner')
 
     df_vacc_withpop.drop('abbrev', axis=1, inplace=True)
     df_vacc_withpop['per1000'] = df_vacc_withpop['Total'] / df_vacc_withpop['2019'] * 1000
@@ -397,78 +364,90 @@ def get_df_pop_and_deaths(df1, df2, df3):
     df_vacc_withpop_and_deaths['relative'] = df_vacc_withpop_and_deaths['Total_x'] / (df_vacc_withpop_and_deaths['Total_deaths'] + .01)
     return df_vacc_withpop_and_deaths
 
-def get_scatter(df1, df2, abbrev, pop):
-    df_scatter = pd.DataFrame
-    idx = df1.index[df1['state'] == abbrev]
-    df_scatter = df1.loc[idx].iloc[0, 1:].to_frame()
-    df_scatter['y'] = df2.loc[idx].iloc[0, 1:]
-    df_scatter.rename(columns={df_scatter.columns[0]: 'x'}, inplace=True)
-    df_scatter.drop('Total', axis=0, inplace=True)
-    df_scatter = df_scatter.cumsum(skipna=True)
-    df_scatter['y'] = df_scatter['y'] / pop * 1000
-    fig = go.Figure(data=go.Scattergl(
-        x=df_scatter['x'],
-        y=df_scatter['y'],
-        mode='markers',
-        marker=dict(
-            color=np.random.randn(1000),
-            colorscale='Blues',
-            line_width=1
-        )
-    ))
-    fig.update_layout(
-        title='Vaccine Doses Shipped vs Covid-19 Deaths Per 1000 Population in {}'.format(abbrev),
-        title_x=0.5,
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
-    )
-
-    return fig
-
-def get_full_scatter(df1, df2):
+def get_case_deaths(df_format):
     '''
-    Returns a px.scatter figure for all vaccine shipments
-    and covid deaths in the available data (all states).
+    Accesses the CDC API for Covid-19 cases and deaths and returns dataframes
+    with more appropriate format.
+    :param df_format: DataFrame
+    The frame to format against, assumed produced by clean_frames above.
+    :return: list
+    '''
+
+    # Load abbreviation to state dicts.
+    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
+
+    # Socrata client.
+    client = Socrata("data.cdc.gov", None)
+
+    # Pulls the data from the API filtering columns and dates.
+    query = 'submission_date > "2020-12-01T00:00:00.000"'
+    columns = 'submission_date, state, tot_cases, new_case, tot_death, new_death'
+    cases_deaths = client.get("9mfq-cb36", where=query, select=columns, limit=10000)
+    df_cases_deaths = pd.DataFrame.from_records(cases_deaths)
+
+    # Normalizes the dates and filters precisely given the cutoff date, in order to keep
+    # only data past the beginning of vaccination.
+    df_cases_deaths['submission_date'] = df_cases_deaths['submission_date'].apply(
+        lambda x: normalize_day(dt.date.fromisoformat(x[0:10])))
+    cutoff_date = dt.date.fromisoformat('2020-12-18')
+    df_cases_deaths = df_cases_deaths[df_cases_deaths['submission_date'] > cutoff_date]
+    df_cases_deaths['submission_date'] = df_cases_deaths['submission_date'].apply(lambda x: str(x))
+
+    # Filters just the 50 states plus D.C.
+    abbrev_list = list(abbrev_to_state.keys())
+    df_cases_deaths = df_cases_deaths[df_cases_deaths['state'].isin(abbrev_list)]
+    df_cases_deaths.reset_index(drop=True, inplace=True)
+
+    # Creates the blank dataframes based on the format frame.
+    indexes = df_format.index.copy()
+    cols = list(df_format.columns.values)
+    df_cases = pd.DataFrame(index=indexes, columns=cols)
+    df_cases.fillna(0, inplace=True)
+    df_cases['abbrev'] = df_format['abbrev']
+    df_deaths = df_cases.copy()
+
+    # Convert string numericals to ints and N/A to 0.
+    columns = list(df_cases_deaths.columns.values)[2:]
+    for col in columns:
+        df_cases_deaths[col] = pd.to_numeric(df_cases_deaths[col])
+
+    # Iterate through the frame and update the formatted frames. Note
+    # there are numerous rows for each date and they are summed to get the
+    # total for the week ending on the date, which is the column head.
+    for row in df_cases_deaths.itertuples():
+        index = abbrev_to_state[row[2]]
+        df_cases.loc[index, row[1]] += row[4]
+        df_deaths.loc[index, row[1]] += row[6]
+
+    return df_cases, df_deaths
+
+def get_fatality_rate(df1, df2):
+    '''
+    Returns a dataframe of the fatality rates in each state with the dates in question.
     :param df1: DataFrame
-    The vaccine shipment frame.
+    The death information.
     :param df2: DataFrame
-    The covid deaths frame.
-    :return: figure
+    The case information
+    :return: DataFrame
     '''
-    # Drop totals, stack rows into a series, and make a dataframe for plotting.
-    df_prep = df1.drop(['state', 'Total'], axis=1)
-    df_prep.drop('Total', axis=0, inplace=True)
-    df_prep = df_prep.cumsum(axis=1, skipna=True)
-    x_list = df_prep.stack(dropna=False)
-    df_prep2 = df2.drop(['state', 'Total'], axis=1)
-    df_prep2.drop('Total', axis=0, inplace=True)
-    df_prep2= df_prep2.cumsum(axis=1, skipna=True)
-    y_list = df_prep2.stack(dropna=False)
-    s_state = x_list.index.to_list()
-    state_list = [tup[0] for tup in s_state]
-    df_full_scatter = pd.DataFrame([x_list, y_list]).transpose().rename(columns={0:'x', 1:'y'})
-    df_full_scatter['label'] = state_list
+    # Copys format of the frames and calculates the rates.
+    indexes = df2.index.copy()
+    cols = list(df2.columns.values)
+    df_fatality_rate = pd.DataFrame(index=indexes, columns=cols)
+    df_fatality_rate['abbrev'] = df1['abbrev']
+    df_fatality_rate.iloc[:, 1:] = df1.iloc[:, 1:] / df2.iloc[:, 1:]
 
-    # fig = px.scatter(df_full_scatter,
-    #                  x='x',
-    #                  y='y')
-    fig = go.Figure(data=go.Scattergl(
-        x=df_full_scatter['x'],
-        y=df_full_scatter['y'],
-        mode='markers',
-        text=df_full_scatter['label'],
-        marker=dict(
-            color=np.random.randn(1000),
-            colorscale='Blues',
-            line_width=1
-        )
-    ))
-    fig.update_layout(
-        title='Cumulative Vaccine Shipments and Deaths for all States',
-        title_x=0.5,
-        xaxis_title='Doses Shipped',
-        yaxis_title='Known deaths caused by Covid-19',
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
-    )
-    return fig
+    return df_fatality_rate
+
+
+def get_frame_totals(df, row=True, col=True):
+    # Total sum per column:
+    if col:
+        df.loc['Total', df.columns[1:]] = df.iloc[:, 1:].sum(axis=0)
+
+    # Total sum per row:
+    if row:
+        df.loc[:, 'Total'] = df.iloc[:, 1:].sum(axis=1)
+
+    return df
