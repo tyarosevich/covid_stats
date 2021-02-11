@@ -31,7 +31,7 @@ def get_scatter(df1, df2, state, abbrev):
     Abbreviation for the title.
     :return:
     '''
-    x_arr = df1.loc[state].iloc[1:-1].cumsum().to_numpy().astype(float)
+    x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)
     y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
     regress_obj = linregress(x_arr, y_arr)
     y_regr = regress_obj.intercept + regress_obj.slope * x_arr
@@ -55,7 +55,7 @@ def get_scatter(df1, df2, state, abbrev):
     ))
 
     fig.update_layout(
-        title='Vaccine Doses Shipped vs Covid-19 Fatality Rate in {}'.format(abbrev),
+        title='Vaccine Doses Administered vs Covid-19 Fatality Rate in {}'.format(abbrev),
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#F0F8FF',
@@ -64,63 +64,16 @@ def get_scatter(df1, df2, state, abbrev):
 
     return fig
 
-def get_full_scatter(df1, df2):
-    '''
-    Returns a px.scatter figure for all vaccine shipments
-    and covid deaths in the available data (all states).
-    :param df1: DataFrame
-    The vaccine shipment frame.
-    :param df2: DataFrame
-    The covid deaths frame.
-    :return: figure
-    '''
-    # Drop totals, stack rows into a series, and make a dataframe for plotting.
-    df_prep = df1.drop(['abbrev', 'Total'], axis=1)
-    df_prep.drop('Total', axis=0, inplace=True)
-    df_prep = df_prep.cumsum(axis=1, skipna=True)
-    x_list = df_prep.stack(dropna=False)
-    df_prep2 = df2.drop(['abbrev', 'Total'], axis=1)
-    df_prep2.drop('Total', axis=0, inplace=True)
-    df_prep2 = df_prep2.cumsum(axis=1, skipna=True)
-    y_list = df_prep2.stack(dropna=False)
-    s_state = x_list.index.to_list()
-    state_list = [tup[0] for tup in s_state]
-    df_full_scatter = pd.DataFrame([x_list, y_list]).transpose().rename(columns={0:'x', 1:'y'})
-    df_full_scatter['label'] = state_list
-
-    # fig = px.scatter(df_full_scatter,
-    #                  x='x',
-    #                  y='y')
-    fig = go.Figure(data=go.Scattergl(
-        x=df_full_scatter['x'],
-        y=df_full_scatter['y'],
-        mode='markers',
-        text=df_full_scatter['label'],
-        marker=dict(
-            color=np.random.randn(1000),
-            colorscale='Blues',
-            line_width=1
-        )
-    ))
-    fig.update_layout(
-        title='Cumulative Vaccine Shipments and Deaths for all States',
-        title_x=0.5,
-        xaxis_title='Doses Shipped',
-        yaxis_title='Known deaths caused by Covid-19',
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
-    )
-    return fig
 
 def get_usa_fig(df1, df2, dropdown):
     if dropdown == 'total':
-        col=df1['Total']
-        colorbar = 'Vaccines Shipped'
-        title = '2020-2021 Doses Shipped by State'
+        col=df1['Total'].iloc[0:-1]
+        colorbar = 'Vaccine Doses Administered'
+        title = 'Vaccine Doses Administered by State'
     else:
-        col=np.log(df1['Total'] / (df2['Total'] + .01))
-        colorbar='Vaccines Shipped Per Covid Case (Log scale)'
-        title = '2020-2021 Doses Shipped per Case by State (Log scale)'
+        col=np.log( df1['Total'].iloc[0:-1] / (df2['Total'].iloc[0:-1] + .0001) )
+        colorbar='Vaccines Administered Per Covid Case (Log scale)'
+        title = 'Vaccine Doses Administered per Case by State (Log scale)'
     # max = np.sort(df['relative'])[-4]
     # Arbitrarily setting these states to the fourth highest * 2 so the
     # so that the heat map is intelligible
@@ -161,7 +114,7 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
     '''
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=list(df1.columns.values), y=np.log(df1.loc[state].iloc[1:-1].cumsum().astype(float)),
+        x=list(df1.columns.values), y=np.log(df1.loc[state].iloc[1:-1].astype(float)),
         fillcolor='#B0E2FF',
         line_color='#FFFFFF',
         fill='tozeroy',
@@ -183,7 +136,7 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
     ))
 
     fig.update_layout(
-        title='Vaccines Shipped / Cases / Deaths Overlay for {} (Log Scale)'.format(abbrev),
+        title='Vaccines Administered / Cases / Deaths Overlay for {} (Log Scale)'.format(abbrev),
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#F0F8FF'
@@ -192,7 +145,7 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
     return fig
 
 def get_pearson(df1, df2, state, abbrev):
-    x_arr = df1.loc[state].iloc[1:-1].cumsum().to_numpy().astype(float)
+    x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)
     y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
     pearson_obj = pearsonr(x_arr, y_arr)
     r = round(pearson_obj[0], 4)

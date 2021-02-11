@@ -15,15 +15,9 @@ import json
 from sodapy import Socrata
 
 # Get the dataframes and combine vaccine totals
-formatted_list = utils.update_frames()
-df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate = formatted_list
-df_vaccine = utils.get_total_frame(df_pfizer, df_moderna)
-abbrev_to_state= utils.load_pickle('data/state_abbrev.pickle')
-df_case_total = utils.get_frame_totals(df_cases)
-df_death_total = utils.get_frame_totals(df_deaths)
-df_fatality_rate_total = utils.get_frame_totals(df_fatality_rate)
-abbrev_to_state= utils.load_pickle('data/state_abbrev.pickle')
-state_to_abbrev  = {b:a for a,b in abbrev_to_state.items()}
+df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_frames()
+abbrev_to_state = utils.load_pickle('data/state_abbrev.pickle')
+state_to_abbrev = {b:a for a,b in abbrev_to_state.items()}
 
 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
@@ -47,7 +41,7 @@ app.layout = html.Div([
             dcc.Dropdown(
                 id='usa1_dropdown',
                 options = [{'label': 'Total Vaccinations Per State', 'value':'total'},
-                           {'label':'Vaccinations Shipped Per Covid Fatality Per State', 'value':'relative'}],
+                           {'label':'Vaccinations Administered Per Covid Fatality Per State', 'value':'relative'}],
                 value= 'total'
             ),
         width=6)
@@ -90,7 +84,7 @@ app.layout = html.Div([
 def update_usa1(dropdown):
     if dropdown == None:
         dropdown = 'total'
-    fig = dash_utils.get_usa_fig(df_vaccine, df_case_total, dropdown)
+    fig = dash_utils.get_usa_fig(df_admin, df_cases, dropdown)
     return fig
 
 
@@ -103,7 +97,7 @@ def update_scatter(hover):
     else:
         abbrev = hover['points'][0]['location']
         state = abbrev_to_state[abbrev]
-    fig = dash_utils.get_scatter(df_vaccine, df_fatality_rate_total, state, abbrev)
+    fig = dash_utils.get_scatter(df_admin, df_fatality_rate, state, abbrev)
     return fig
 
 
@@ -116,7 +110,7 @@ def update_overlay(hover):
     else:
         abbrev = hover['points'][0]['location']
         state = abbrev_to_state[abbrev]
-    fig = dash_utils.get_overlay_fig(df_vaccine, df_case_total, df_death_total, state, abbrev)
+    fig = dash_utils.get_overlay_fig(df_admin, df_cases, df_deaths, state, abbrev)
     return fig
 
 @app.callback(Output('pearson', 'children'), Input('usa1', 'hoverData'))
@@ -127,7 +121,7 @@ def update_pearsons(hover):
     else:
         abbrev = hover['points'][0]['location']
         state = abbrev_to_state[abbrev]
-    output = dash_utils.get_pearson(df_vaccine, df_fatality_rate_total, state, abbrev)
+    output = dash_utils.get_pearson(df_admin, df_fatality_rate, state, abbrev)
 
     return output
 
