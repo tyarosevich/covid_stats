@@ -35,8 +35,8 @@ def get_scatter(df1, df2, state, abbrev, shift=False):
         # This shifts the vaccination data forward 3 weeks, which roughly
         # corresponds to when immunization would impact fatality rates (18-19 days
         # on average)
-        x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)[3:]
-        y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)[0:-3]
+        x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)[0:-3]
+        y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)[3:]
         pearson_obj = pearsonr(x_arr, y_arr)
         title = ['Vaccinations shifted up 3 weeks vs Covid-19 Fatality Rate in {}'.format(abbrev),
                 'The pearson correlation is r={}'.format(round(pearson_obj[0], 4))]
@@ -74,7 +74,9 @@ def get_scatter(df1, df2, state, abbrev, shift=False):
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#F0F8FF',
-        showlegend=False
+        showlegend=False,
+        xaxis_title='Cumulative Vaccine Doses Administered',
+        yaxis_title='Weekly Fatality Rate of Covid-19 Cases',
     )
 
     return fig
@@ -154,7 +156,8 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
         title='Vaccines Administered / Cases / Deaths Overlay for {} (Log Scale)'.format(abbrev),
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
+        plot_bgcolor='#F0F8FF',
+        xaxis_title='Weekly values are normalized to the next Saturday',
     )
 
     return fig

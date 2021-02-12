@@ -18,11 +18,17 @@ from sodapy import Socrata
 df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_frames()
 abbrev_to_state = utils.load_pickle('data/state_abbrev.pickle')
 state_to_abbrev = {b:a for a,b in abbrev_to_state.items()}
+with open('data/about.txt', 'r') as file:
+    text_input = file.read().replace('\n', '')
 
 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 application = app.server
+subtitle = 'Please mouseover a state to begin. Initial values are for the' \
+           ' entire U.S. State-wide values are truncated to overlapping data ' \
+           'points and will update automatically once a week. Please see below' \
+           'for project details.'
 
 
 # # Call the USA fig
@@ -34,7 +40,11 @@ app.layout = html.Div([
     # App heading
     dbc.Row([
         dbc.Col(
-            html.H1("Mouseover a State to begin", style={'textAlign':'center'}), width=12)
+            html.H1("U.S. Covid-19 Vaccination/Mortality Correlation", style={'textAlign':'center'}), width=12)
+    ]),
+    dbc.Row([
+        dbc.Col(
+            html.H1(subtitle, style={'textAlign': 'center', 'font-size':'20px'}), width={'size':8, 'offset':2})
     ]),
     dbc.Row([
         dbc.Col(
@@ -61,6 +71,23 @@ app.layout = html.Div([
         ),
         dbc.Col(
             dcc.Graph(id='shifted_scatter'), width=6
+        )
+    ]),
+    dbc.Row([
+        dbc.Col(
+            dcc.Textarea(
+                id='about_text',
+                value=text_input,
+                style={'width':'80%', 'height':100}
+            ), width={'size':8, 'offset':2})
+    ]),
+    dbc.Row([
+        dbc.Col(
+            dbc.Button(
+                'My personal website',
+                id='link1',
+                href='https://trenty.net/'
+            ), width={'size':3, 'offset':5}
         )
     ])
     # Code to check the mouseover output.
