@@ -17,7 +17,7 @@ import dash_bootstrap_components as dbc
 
 
 
-def get_scatter(df1, df2, state, abbrev):
+def get_scatter(df1, df2, state, abbrev, shift=False):
     '''
     Creates a figure plotting a particular state's vaccination running total
     against its fatality rate to try to show the expected relationship.
@@ -31,8 +31,24 @@ def get_scatter(df1, df2, state, abbrev):
     Abbreviation for the title.
     :return:
     '''
-    x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)
-    y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
+    if shift:
+        # This shifts the vaccination data forward 3 weeks, which roughly
+        # corresponds to when immunization would impact fatality rates (18-19 days
+        # on average)
+        x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)[3:]
+        y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)[0:-3]
+        pearson_obj = pearsonr(x_arr, y_arr)
+        title = ['Vaccinations shifted up 3 weeks vs Covid-19 Fatality Rate in {}'.format(abbrev),
+                'The pearson correlation is r={}'.format(round(pearson_obj[0], 4))]
+        title = '<br>'.join(title)
+    else:
+        x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)
+        y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
+        pearson_obj = pearsonr(x_arr, y_arr)
+        title = ['Vaccinations Administered vs Covid-19 Fatality Rate in {}'.format(abbrev),
+                'The pearson correlation is r={}'.format(round(pearson_obj[0], 4))]
+        title = '<br>'.join(title)
+    r = round(pearson_obj[0], 4)
     regress_obj = linregress(x_arr, y_arr)
     y_regr = regress_obj.intercept + regress_obj.slope * x_arr
     fig = go.Figure(data=go.Scattergl(
@@ -51,11 +67,10 @@ def get_scatter(df1, df2, state, abbrev):
         y=y_regr,
         mode='lines',
         line_color='#6CA6CD',
-        name='linear regression p={}'.format(round(regress_obj.pvalue, 4))
     ))
 
     fig.update_layout(
-        title='Vaccine Doses Administered vs Covid-19 Fatality Rate in {}'.format(abbrev),
+        title=title,
         title_x=0.5,
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#F0F8FF',
@@ -143,11 +158,3 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
     )
 
     return fig
-
-def get_pearson(df1, df2, state, abbrev):
-    x_arr = df1.loc[state].iloc[1:-1].to_numpy().astype(float)
-    y_arr = df2.loc[state].iloc[1:-1].to_numpy().astype(float)
-    pearson_obj = pearsonr(x_arr, y_arr)
-    r = round(pearson_obj[0], 4)
-    report = 'The Pearson correlation for the data from {} is r={}'.format(abbrev, r)
-    return report

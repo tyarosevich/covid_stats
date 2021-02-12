@@ -205,3 +205,20 @@ def get_full_scatter(df1, df2):
         plot_bgcolor='#F0F8FF'
     )
     return fig
+
+html.H2(id='pearson'),
+                style={'width': '30%', 'display': 'inline-block', 'text-align': 'center',
+                       'vertical-align': 'middle'}, width=6
+
+
+@app.callback(Output('pearson', 'children'), Input('usa1', 'hoverData'))
+def update_pearsons(hover):
+    if hover == None:
+        abbrev = 'U.S.'
+        state = 'Total'
+    else:
+        abbrev = hover['points'][0]['location']
+        state = abbrev_to_state[abbrev]
+    output = utils.get_pearson(df_admin, df_fatality_rate, state, abbrev)
+
+    return output

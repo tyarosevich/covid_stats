@@ -417,3 +417,5 @@ def get_fatality_averages(df):
     df.loc[:, 'Total'] = df.iloc[:, 1:].mean(axis=1)
 
     return df
+
+
