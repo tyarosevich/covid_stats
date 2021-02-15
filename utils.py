@@ -4,6 +4,7 @@ import datetime as dt
 import pandas as pd
 from sodapy import Socrata
 import numpy as np
+from itertools import compress
 
 def load_pickle(path):
     '''
@@ -142,17 +143,6 @@ def str_to_int(str):
 
 def update_frames(force_save=False):
 
-    # Old attempt at dynamic update.
-    # df_pfizer = list_frames[0]
-    # df_moderna = list_frames[1]
-    # df_deaths = list_frames[2]
-    # df_pfizer_new = pfiz_mod_updates(df_pfizer, client)
-    # df_moderna_new = pfiz_mod_updates(df_moderna, client)
-    # df_deaths_new = covid_deaths_updates(df_deaths, df_pfizer, client)
-    #
-    # return [df_pfizer_new, df_moderna_new, df_deaths_new]
-
-    # Easier to just grab JSONs again, they are small.
 
     # Get the day of the week and load the update completed flag.
     # (this is a hacky work around to using a lib for such a simple task).
@@ -164,25 +154,11 @@ def update_frames(force_save=False):
         flag = 1
         save_pickle('data/flag.pickle', flag)
         client = Socrata("data.cdc.gov", None)
-        # Get jsons from CDC
-        results_pfizer = client.get("saz5-9hgg", limit=1000)
-        results_moderna = client.get("b7pe-5nws", limit=1000)
-        # covid_deaths = client.get("muzy-jte6", limit=6000)
 
-        # Convert to pandas DataFrame
-        df_pfizer = pd.DataFrame.from_records(results_pfizer)
-        df_moderna = pd.DataFrame.from_records(results_moderna)
-        # df_covid_deaths = pd.DataFrame.from_records(covid_deaths)
-
-        # Collects all the data from APIs/Github, normalizes them to the largest
-        # shared span of time, and adds total rows and columns.
-        df_pfizer_formatted = clean_frame(df_pfizer, 'pfizer')
-        df_moderna_formatted = clean_frame(df_moderna, 'moderna')
-        df_cases, df_deaths = get_case_deaths(df_pfizer_formatted)
+        df_cases, df_deaths = get_case_deaths()
         df_fatality_rate = get_fatality_rate(df_deaths, df_cases)
-        df_admin, df_second_admin = get_administered(df_pfizer_formatted)
-        frame_list = normalize_frames([df_pfizer_formatted, df_moderna_formatted,
-                                       df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin])
+        df_admin, df_second_admin = get_administered(df_cases)
+        frame_list = normalize_frames([df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin])
         frame_list = add_totals(frame_list)
         # Save formatted data
         save_pickle('data/formatted_data.pickle', frame_list)
@@ -206,7 +182,7 @@ def total_rows_columns(df):
     return df
 
 
-def get_case_deaths(df_format):
+def get_case_deaths():
     '''
     Accesses the CDC API for Covid-19 cases and deaths and returns dataframes
     with more appropriate format.
@@ -236,17 +212,22 @@ def get_case_deaths(df_format):
     df_cases_deaths = df_cases_deaths[df_cases_deaths['submission_date'] > cutoff_date]
     df_cases_deaths['submission_date'] = df_cases_deaths['submission_date'].apply(lambda x: str(x))
 
+    unique_dates = list(set([dt.date.fromisoformat(x) for x in df_cases_deaths['submission_date']]))
+    unique_dates.sort()
+
     # Filters just the 50 states plus D.C.
     abbrev_list = list(abbrev_to_state.keys())
+    index_list = list(abbrev_to_state.values())
+
     df_cases_deaths = df_cases_deaths[df_cases_deaths['state'].isin(abbrev_list)]
     df_cases_deaths.reset_index(drop=True, inplace=True)
 
     # Creates the blank dataframes based on the format frame.
-    indexes = df_format.index.copy()
-    cols = list(df_format.columns.values)
-    df_cases = pd.DataFrame(index=indexes, columns=cols)
+    cols = ['abbrev'] + [str(x) for x in unique_dates]
+
+    df_cases = pd.DataFrame(index=index_list, columns=cols)
     df_cases.fillna(0, inplace=True)
-    df_cases['abbrev'] = df_format['abbrev']
+    df_cases['abbrev'] = abbrev_list
     df_deaths = df_cases.copy()
 
     # Convert string numericals to ints and N/A to 0.
@@ -310,6 +291,8 @@ def get_administered(df_format):
     # Pull the data from github since CDD doesn't have it in their APIs.
     abbrev_to_state = load_pickle('data/state_abbrev.pickle')
     state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
+    # The data source uses New York 'State'.
+    state_to_abbrev['New York State'] = 'NY'
     url = 'https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/us_state_vaccinations.csv'
     df_admin_build = pd.read_csv(url, index_col=0)[['location', 'total_vaccinations', 'people_fully_vaccinated']]
 
@@ -318,11 +301,16 @@ def get_administered(df_format):
     df_admin_build.set_index('location', drop=False, inplace=True)
 
 
-    # Filter by date and change back to string for conversion to column labels.
+    # Filter by the date that vaccination began, and the most recent date that we
+    # have cases/deaths data for.
+    cols = list(df_format.columns.values)
+    end_date = dt.date.fromisoformat(cols[-1])
     df_admin_build['date'] = df_admin_build['date'].apply(
         lambda x: normalize_day(dt.date.fromisoformat(x)))
     cutoff_date = dt.date.fromisoformat('2020-12-18')
     df_admin_build = df_admin_build[df_admin_build['date'] > cutoff_date]
+    df_admin_build = df_admin_build[df_admin_build['date'] < end_date]
+
     df_admin_build['date'] = df_admin_build['date'].apply(lambda x: str(x))
 
     # Change abbreviation column to appropriate form.
@@ -335,7 +323,6 @@ def get_administered(df_format):
 
     # Creates the blank dataframes based on the format frame.
     indexes = df_format.index.copy()
-    cols = list(df_format.columns.values)
     df_admin_final = pd.DataFrame(index=indexes, columns=cols)
     df_admin_final.fillna(0, inplace=True)
     df_admin_final['abbrev'] = df_format['abbrev']
@@ -366,30 +353,32 @@ def get_admin_totals(df):
     return df
 
 
-def drop_zero_cols(df):
-    '''
-    Drops any columns containing only zeros.
-    :param df: DataFrame
-    :return: DataFrame
-    '''
-    df = df.loc[:, (df != 0).any(axis=0)]
-    return df
-
 def normalize_frames(frame_list):
+    '''
+    Normalizes the columns of all the frames to only contain weeks in which all of
+    the sources have data.
+    :param frame_list:
+    :return:
+    '''
 
-    len_list = [len(drop_zero_cols(frame).columns) for frame in frame_list]
-    min_frame_idx = len_list.index(min(len_list))
-    base_frame = drop_zero_cols(frame_list[min_frame_idx])
-    base_cols = list(base_frame.columns.values)
+    # df.any() returns True for each column that isn't all zeros. This goes into a list of arrays
+    # and gets stacked into a matrix.
+    frame_booleans = np.vstack([df.any(axis=0, skipna=True).to_numpy() for df in frame_list])
+    # Elementwise product of the rows of the matrix. Get list of all column names, then use
+    # compress to filter out the dates to keep using the mask and the list of column names.
+    # This gives the list of columns to filter every frame with.
+    bool_mask = np.prod(frame_booleans, axis=0)
+    columns = list(frame_list[0].columns.values)
+    output_cols = list(compress(columns, bool_mask))
+    return_list = [frame[output_cols] for frame in frame_list]
 
-    frame_list = [frame[base_cols] for frame in frame_list]
-
-    return frame_list
+    return return_list
 
 
 def add_totals(frame_list):
     '''
-    Returns a list of the project's dataframes with 'Total' rows and columns.
+    Returns a list of the project's dataframes with 'Total' rows and columns. Headings remain the same for
+    convenience, but in the case of rates, the 'Total' is the mean.
     :param frame_list: list
     :return: list
     '''
@@ -397,16 +386,14 @@ def add_totals(frame_list):
     # pfizer, moderna, cases, deaths, fatality rate, administered, 2nd administered.
     # Since some frames need no total (fatality), some are time series, and some are
     # already running totals.
-    df1, df2, df3, df4, df5, df6, df7 = frame_list
-    df1 = get_frame_totals(df1)
-    df2 = get_frame_totals(df2)
+    df3, df4, df5, df6, df7 = frame_list # Numbers wonky cause changes.
     df3 = get_frame_totals(df3)
     df4 = get_frame_totals(df4)
     df5 = get_fatality_averages(df5)
     df6 = get_admin_totals(df6)
     df7 = get_admin_totals(df7)
 
-    return [df1, df2, df3, df4, df5, df6, df7]
+    return [df3, df4, df5, df6, df7]
 
 def get_fatality_averages(df):
 

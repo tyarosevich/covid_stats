@@ -15,7 +15,7 @@ import json
 from sodapy import Socrata
 
 # Get the dataframes and combine vaccine totals
-df_pfizer, df_moderna, df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_frames()
+df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_frames()
 abbrev_to_state = utils.load_pickle('data/state_abbrev.pickle')
 state_to_abbrev = {b:a for a,b in abbrev_to_state.items()}
 with open('data/about.txt', 'r') as file:
@@ -69,9 +69,9 @@ app.layout = html.Div([
         dbc.Col(
            dcc.Graph(id='scatter'), width=6
         ),
-        dbc.Col(
-            dcc.Graph(id='shifted_scatter'), width=6
-        )
+        # dbc.Col(
+        #     dcc.Graph(id='shifted_scatter'), width=6
+        # )
     ]),
     dbc.Row([
         dbc.Col(
@@ -139,17 +139,17 @@ def update_scatter(hover):
     return fig
 
 
-@app.callback(Output('shifted_scatter', 'figure'), Input('usa1', 'hoverData'))
-def update_scatter(hover):
-    # Put initial value to CA.
-    if hover == None:
-        abbrev = 'U.S.'
-        state = 'Total'
-    else:
-        abbrev = hover['points'][0]['location']
-        state = abbrev_to_state[abbrev]
-    fig = dash_utils.get_scatter(df_admin, df_fatality_rate, state, abbrev, shift=True)
-    return fig
+# @app.callback(Output('shifted_scatter', 'figure'), Input('usa1', 'hoverData'))
+# def update_scatter(hover):
+#     # Put initial value to CA.
+#     if hover == None:
+#         abbrev = 'U.S.'
+#         state = 'Total'
+#     else:
+#         abbrev = hover['points'][0]['location']
+#         state = abbrev_to_state[abbrev]
+#     fig = dash_utils.get_scatter(df_admin, df_fatality_rate, state, abbrev, shift=True)
+#     return fig
 
 # Code to check the mouseover output.
 # @app.callback(

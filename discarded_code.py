@@ -222,3 +222,40 @@ def update_pearsons(hover):
     output = utils.get_pearson(df_admin, df_fatality_rate, state, abbrev)
 
     return output
+
+def get_zero_cols(df):
+    '''
+    Drops any columns containing only zeros.
+    :param df: DataFrame
+    :return: DataFrame
+    '''
+    is_zeros = df.loc[:, (df != 0).any(axis=0)]
+    return df
+
+    # Old attempt at dynamic update.
+    # df_pfizer = list_frames[0]
+    # df_moderna = list_frames[1]
+    # df_deaths = list_frames[2]
+    # df_pfizer_new = pfiz_mod_updates(df_pfizer, client)
+    # df_moderna_new = pfiz_mod_updates(df_moderna, client)
+    # df_deaths_new = covid_deaths_updates(df_deaths, df_pfizer, client)
+    #
+    # return [df_pfizer_new, df_moderna_new, df_deaths_new]
+
+    # Easier to just grab JSONs again, they are small.
+
+
+# Get jsons from CDC
+results_pfizer = client.get("saz5-9hgg", limit=1000)
+results_moderna = client.get("b7pe-5nws", limit=1000)
+# covid_deaths = client.get("muzy-jte6", limit=6000)
+
+# Convert to pandas DataFrame
+df_pfizer = pd.DataFrame.from_records(results_pfizer)
+df_moderna = pd.DataFrame.from_records(results_moderna)
+# df_covid_deaths = pd.DataFrame.from_records(covid_deaths)
+
+# Collects all the data from APIs/Github, normalizes them to the largest
+# shared span of time, and adds total rows and columns.
+df_pfizer_formatted = clean_frame(df_pfizer, 'pfizer')
+df_moderna_formatted = clean_frame(df_moderna, 'moderna')
