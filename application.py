@@ -19,7 +19,7 @@ df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_
 abbrev_to_state = utils.load_pickle('data/state_abbrev.pickle')
 state_to_abbrev = {b:a for a,b in abbrev_to_state.items()}
 with open('data/about.txt', 'r') as file:
-    text_input = file.read().replace('\n', '')
+    text_input = file.read()#.replace('\n', '')
 
 
 external_stylesheets = [dbc.themes.BOOTSTRAP] #### NEED TO FIND A PRETTY BOOTSTRAP STYLESHEET
@@ -27,12 +27,11 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 application = app.server
 subtitle = 'Please mouseover a state to begin. Initial values are for the' \
            ' entire U.S. State-wide values are truncated to overlapping data ' \
-           'points and will update automatically once a week. Please see below' \
+           'points and will update automatically once a week. Please see below ' \
            'for project details.'
 
 
-# # Call the USA fig
-# fig = utils.get_vacc_fig(df_vaccine)
+fig = dash_utils.get_full_scatter(df_admin, df_deaths, state_to_abbrev)
 
 app.title='Covid-19 Vaccination-Mortality Correlation Data'
 
@@ -67,18 +66,28 @@ app.layout = html.Div([
     ]),
     dbc.Row([
         dbc.Col(
+            dcc.Dropdown(
+                id='scatter_dropdown',
+                options=[{'label': 'Deaths versus Vaccinations', 'value': 'unshifted'},
+                         {'label': 'Deaths v. Vaccinations Shifted 3 Weeks', 'value': 'shifted'}],
+                value='unshifted'
+            ),
+            width=6)
+    ]),
+    dbc.Row([
+        dbc.Col(
            dcc.Graph(id='scatter'), width=6
         ),
-        # dbc.Col(
-        #     dcc.Graph(id='shifted_scatter'), width=6
-        # )
+        dbc.Col(
+            dcc.Graph(id='full_scatter', figure=fig), width=6
+        )
     ]),
     dbc.Row([
         dbc.Col(
             dcc.Textarea(
                 id='about_text',
                 value=text_input,
-                style={'width':'80%', 'height':100}
+                style={'width':'80%', 'height':300}
             ), width={'size':8, 'offset':2})
     ]),
     dbc.Row([
@@ -90,7 +99,7 @@ app.layout = html.Div([
             ), width={'size':3, 'offset':5}
         )
     ])
-    # Code to check the mouseover output.
+    # # Code to check the mouseover output.
     # html.Div(className='row', children=[
     #     html.Div([
     #         dcc.Markdown("""
@@ -105,7 +114,7 @@ app.layout = html.Div([
 
 # Retrieves a figure to output the geographical heatmap of the US based
 # on the dropdown value.
-@app.callback(Output('usa1','figure'), Input('usa1_dropdown', 'value'))
+@app.callback(Output('usa1','figure'), [Input('usa1_dropdown', 'value')])
 def update_usa1(dropdown):
     if dropdown == None:
         dropdown = 'total'
@@ -126,8 +135,8 @@ def update_overlay(hover):
     return fig
 
 
-@app.callback(Output('scatter', 'figure'), Input('usa1', 'hoverData'))
-def update_scatter(hover):
+@app.callback(Output('scatter', 'figure'), [Input('usa1', 'hoverData'), Input('scatter_dropdown', 'value')])
+def update_scatter(hover, dropdown):
     # Put initial value to CA.
     if hover == None:
         abbrev = 'U.S.'
@@ -135,21 +144,8 @@ def update_scatter(hover):
     else:
         abbrev = hover['points'][0]['location']
         state = abbrev_to_state[abbrev]
-    fig = dash_utils.get_scatter(df_admin, df_fatality_rate, state, abbrev)
+    fig = dash_utils.get_scatter(df_admin, df_deaths, state, abbrev, shift = dropdown)
     return fig
-
-
-# @app.callback(Output('shifted_scatter', 'figure'), Input('usa1', 'hoverData'))
-# def update_scatter(hover):
-#     # Put initial value to CA.
-#     if hover == None:
-#         abbrev = 'U.S.'
-#         state = 'Total'
-#     else:
-#         abbrev = hover['points'][0]['location']
-#         state = abbrev_to_state[abbrev]
-#     fig = dash_utils.get_scatter(df_admin, df_fatality_rate, state, abbrev, shift=True)
-#     return fig
 
 # Code to check the mouseover output.
 # @app.callback(
