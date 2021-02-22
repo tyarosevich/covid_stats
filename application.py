@@ -31,8 +31,6 @@ subtitle = 'Please mouseover a state to begin. Initial values are for the' \
            'for project details.'
 
 
-fig = dash_utils.get_full_scatter(df_admin, df_deaths, state_to_abbrev)
-
 app.title='Covid-19 Vaccination-Mortality Correlation Data'
 
 app.layout = html.Div([
@@ -72,6 +70,14 @@ app.layout = html.Div([
                          {'label': 'Deaths v. Vaccinations Shifted 3 Weeks', 'value': 'shifted'}],
                 value='unshifted'
             ),
+            width=6),
+        dbc.Col(
+            dcc.Dropdown(
+                id='timeseries_dropdown',
+                options=[{'label': 'Vaccinations per week', 'value': 'vaccinations'},
+                         {'label': 'Deaths per week', 'value': 'deaths'}],
+                value='vaccinations'
+            ),
             width=6)
     ]),
     dbc.Row([
@@ -79,7 +85,7 @@ app.layout = html.Div([
            dcc.Graph(id='scatter'), width=6
         ),
         dbc.Col(
-            dcc.Graph(id='full_scatter', figure=fig), width=6
+            dcc.Graph(id='time_fig'), width=6
         )
     ]),
     dbc.Row([
@@ -137,7 +143,7 @@ def update_overlay(hover):
 
 @app.callback(Output('scatter', 'figure'), [Input('usa1', 'hoverData'), Input('scatter_dropdown', 'value')])
 def update_scatter(hover, dropdown):
-    # Put initial value to CA.
+    # Put initial value to all of US.
     if hover == None:
         abbrev = 'U.S.'
         state = 'Total'
@@ -146,6 +152,23 @@ def update_scatter(hover, dropdown):
         state = abbrev_to_state[abbrev]
     fig = dash_utils.get_scatter(df_admin, df_deaths, state, abbrev, shift = dropdown)
     return fig
+
+@app.callback(Output('time_fig', 'figure'), [Input('usa1', 'hoverData'), Input('timeseries_dropdown', 'value')])
+def update_time_scatter(hover, dropdown):
+    # Put initial value to all of US.
+    if hover == None:
+        abbrev = 'U.S.'
+        state = 'Total'
+    else:
+        abbrev = hover['points'][0]['location']
+        state = abbrev_to_state[abbrev]
+    if dropdown == 'vaccinations':
+        df = df_admin
+    else:
+        df = df_deaths
+    fig = dash_utils.get_time_plot(df, state, dropdown)
+    return fig
+
 
 # Code to check the mouseover output.
 # @app.callback(

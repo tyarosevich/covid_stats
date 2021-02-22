@@ -162,49 +162,35 @@ def get_overlay_fig(df1, df2, df3, state, abbrev):
 
     return fig
 
-def get_full_scatter(df1, df2, state_dict):
-    '''
-    Returns a px.scatter figure for all vaccinations
-    and covid deaths in the available data (all states).
-    :param df1: DataFrame
-    The vaccination frame.
-    :param df2: DataFrame
-    The covid deaths frame.
-    :return: figure
-    '''
-    # Drop totals, stack rows into a series, and make a dataframe for plotting.
-    df_prep = df1.drop(['abbrev', 'Total'], axis=1)
-    df_prep.drop('Total', axis=0, inplace=True)
-    x_list = df_prep.stack(dropna=False)
-    df_prep2 = df2.drop(['abbrev', 'Total'], axis=1)
-    df_prep2.drop('Total', axis=0, inplace=True)
-    y_list = df_prep2.stack(dropna=False)
-    s_state = x_list.index.to_list()
-    state_list = [tup[0] for tup in s_state]
-    df_full_scatter = pd.DataFrame([x_list, y_list]).transpose().rename(columns={0:'x', 1:'y'})
-    df_full_scatter['label'] = state_list
-    state_list = list(state_dict.keys())
-    color_vals = np.arange(len(state_list))
-    color_dict = dict(zip(state_list, color_vals))
-    df_full_scatter['colors'] = df_full_scatter['label'].map(color_dict)
+def get_time_plot(df, state, dropdown):
+    y_arr = df.loc[state]
+    x_arr = y_arr.index
+    if dropdown == 'vaccinations':
+        title = 'Vaccinations per week'
+    else:
+        title = 'Deaths per week'
 
     fig = go.Figure(data=go.Scattergl(
-        x=df_full_scatter['x'],
-        y=df_full_scatter['y'],
-        mode='markers',
-        text=df_full_scatter['label'],
+        x=x_arr,
+        y=y_arr,
+        mode='lines+markers',
+        line_color='#6CA6CD',
         marker=dict(
-            color=df_full_scatter['colors'],
+            color=np.random.randn(1000),
             colorscale='Blues',
-            line_width=1
+            line_width=1,
+            size=8
         )
     ))
+
     fig.update_layout(
-        title='Cumulative data for all states and weeks (highlight sections to examine)',
+        title=title,
         title_x=0.5,
-        xaxis_title='Doses Administered',
-        yaxis_title='Known deaths caused by Covid-19',
         paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#F0F8FF'
+        plot_bgcolor='#F0F8FF',
+        showlegend=False,
+        xaxis_title='Cumulative Vaccine Doses Administered',
+        yaxis_title='Weekly Deaths cause by Covid-19',
     )
+
     return fig
