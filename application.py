@@ -16,9 +16,9 @@ from sodapy import Socrata
 
 # Get the dataframes and combine vaccine totals
 df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin = utils.update_frames()
-abbrev_to_state = utils.load_pickle('data/state_abbrev.pickle')
+abbrev_to_state = utils.load_pickle('static/state_abbrev.pickle')
 state_to_abbrev = {b:a for a,b in abbrev_to_state.items()}
-with open('data/about.txt', 'r') as file:
+with open('static/about.txt', 'r') as file:
     text_input = file.read()#.replace('\n', '')
 
 
@@ -181,10 +181,8 @@ def update_time_scatter(hover, dropdown):
 ######################
 ######################
 ######################
-if __name__ == '__main__':
-    app.run_server(debug=True)
-
 # if __name__ == '__main__':
-#     .
-#     .
-#     app.run_server(host='0.0.0.0', port=8050, debug=True)
+#     app.run_server(debug=True)
+
+if __name__ == '__main__':
+    app.run_server(host = '0.0.0.0', port=8080, debug=True)

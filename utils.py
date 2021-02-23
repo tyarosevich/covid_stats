@@ -84,7 +84,7 @@ def clean_frame(df, type):
                    "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon",
                    "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
                    "Utah", "Virginia", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
-    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    abbrev_to_state = load_pickle('static/state_abbrev.pickle')
     state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
 
     columns = list(df.columns.values)
@@ -146,13 +146,13 @@ def update_frames(force_save=False):
 
     # Get the day of the week and load the update completed flag.
     # (this is a hacky work around to using a lib for such a simple task).
-    flag = load_pickle('data/flag.pickle')
+    flag = load_pickle('static/flag.pickle')
     today = dt.date.today()
     day_of_week = today.weekday()
     # If it's monday, run update and flag the update as done.
     if day_of_week == 0 and flag == 0 or force_save:
         flag = 1
-        save_pickle('data/flag.pickle', flag)
+        save_pickle('static/flag.pickle', flag)
         client = Socrata("data.cdc.gov", None)
 
         df_cases, df_deaths = get_case_deaths()
@@ -161,14 +161,14 @@ def update_frames(force_save=False):
         frame_list = normalize_frames([df_cases, df_deaths, df_fatality_rate, df_admin, df_second_admin])
         frame_list = add_totals(frame_list)
         # Save formatted data
-        save_pickle('data/formatted_data.pickle', frame_list)
+        save_pickle('static/formatted_data.pickle', frame_list)
 
         return frame_list
     # If it's not monday, flag for update.
     else:
         flag = 0
-        save_pickle('data/flag.pickle', flag)
-        frame_list = load_pickle('data/formatted_data.pickle')
+        save_pickle('static/flag.pickle', flag)
+        frame_list = load_pickle('static/formatted_data.pickle')
         return frame_list
 
 
@@ -192,7 +192,7 @@ def get_case_deaths():
     '''
 
     # Load abbreviation to state dicts.
-    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    abbrev_to_state = load_pickle('static/state_abbrev.pickle')
     state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
 
     # Socrata client.
@@ -289,7 +289,7 @@ def get_administered(df_format):
     '''
 
     # Pull the data from github since CDD doesn't have it in their APIs.
-    abbrev_to_state = load_pickle('data/state_abbrev.pickle')
+    abbrev_to_state = load_pickle('static/state_abbrev.pickle')
     state_to_abbrev = {b: a for a, b in abbrev_to_state.items()}
     # The data source uses New York 'State'.
     state_to_abbrev['New York State'] = 'NY'
