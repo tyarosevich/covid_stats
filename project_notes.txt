@@ -20,5 +20,10 @@ If it's working:
 eb init
 eb create
 
+eb deploy can be used to push changes for already existing projects, super handy.
+
+having issues with the eb cli path and it's irritating as shit. the command to add to bash_profile, which only works for a given terminal session, is:
+echo 'export PATH="/root/.ebcli-virtual-env/executables:$PATH"' >> ~/.bash_profile && source ~/.bash_profile
+
 Options just need to be sensible. AWS LInux 2 / Application / etc
 
