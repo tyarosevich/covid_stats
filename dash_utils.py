@@ -167,8 +167,10 @@ def get_time_plot(df, state, dropdown):
     x_arr = y_arr.index
     if dropdown == 'vaccinations':
         title = 'Vaccinations per week'
+        y_title = 'Vaccinations'
     else:
         title = 'Deaths per week'
+        y_title = 'Deaths'
 
     fig = go.Figure(data=go.Scattergl(
         x=x_arr,
@@ -189,8 +191,8 @@ def get_time_plot(df, state, dropdown):
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#F0F8FF',
         showlegend=False,
-        xaxis_title='Cumulative Vaccine Doses Administered',
-        yaxis_title='Weekly Deaths cause by Covid-19',
+        xaxis_title='Week ending on',
+        yaxis_title='Weekly {}'.format(y_title),
     )
 
     return fig
