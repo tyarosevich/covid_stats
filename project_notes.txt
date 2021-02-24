@@ -1,0 +1,7 @@
+Note that creating a pip requirements.txt file from a conda env should be done with:
+
+pathtopip/pip list --format=freeze > requirements.txt
+
+Simply using freeze gives weird symbolic links.
+
+
