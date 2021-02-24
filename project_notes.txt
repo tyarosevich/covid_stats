@@ -5,3 +5,20 @@ pathtopip/pip list --format=freeze > requirements.txt
 Simply using freeze gives weird symbolic links.
 
 
+Also note that you must commit changes befor deploying to EB.
+
+Deployment workflow:
+
+alter python files
+adapt dockerfile from other projects if need be - do not use conda envs (memory reasons)
+may have to get AWS credentials to log in with eb cli - they are the standard key/secret key in the CSV file.
+may have to log in to docker
+docker build -t <image name> .
+docker run <image name>
+click on link to check locally. if port issues you can do docker run -p XXXX:XXXX to get a specific port and go to http://0.0.0.0:XXXX or something like that
+If it's working:
+eb init
+eb create
+
+Options just need to be sensible. AWS LInux 2 / Application / etc
+
