@@ -13,8 +13,7 @@ COPY application.py .
 COPY utils.py .
 copy dash_utils.py .
 COPY assets/ /app/assets/
-# COPY static/ /app/static/
-COPY static/ /tmp/
+COPY static/ /app/static/
 EXPOSE 8080
 CMD ["python", "./application.py"]
 
